@@ -1,0 +1,4 @@
+#!/bin/bash
+# Pipe things to clip and they end up on your clipboard
+
+xclip -sel clip -i

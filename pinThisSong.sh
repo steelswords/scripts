@@ -26,7 +26,7 @@ fi
 
 # title, artist, album
 
-playerctl metadata | awk '/xesam:title /{printf $3 ", " }' >> "$songListFile"
-playerctl metadata | awk '/xesam:album /{printf $3 ", " }' >> "$songListFile"
-playerctl metadata | awk '/xesam:albumArtist /{printf $3 }' >> "$songListFile"
+playerctl metadata | awk '/xesam:title /{$1=$2=""; printf $0 ", " }' >> "$songListFile"
+playerctl metadata | awk '/xesam:album /{$1=$2=""; printf $0 ", " }' >> "$songListFile"
+playerctl metadata | awk '/xesam:albumArtist /{$1=$2=""; printf $0 }' >> "$songListFile"
 echo "" >> "$songListFile"

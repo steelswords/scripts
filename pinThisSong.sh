@@ -26,7 +26,10 @@ fi
 
 # title, artist, album
 
-playerctl metadata | awk '/xesam:title /{$1=$2=""; printf $0 ", " }' >> "$songListFile"
-playerctl metadata | awk '/xesam:album /{$1=$2=""; printf $0 ", " }' >> "$songListFile"
-playerctl metadata | awk '/xesam:albumArtist /{$1=$2=""; printf $0 }' >> "$songListFile"
-echo "" >> "$songListFile"
+title="$(  playerctl metadata | awk '/xesam:title /{$1=$2=""; printf $0}' )"
+album="$(  playerctl metadata | awk '/xesam:album /{$1=$2=""; printf $0}' )"
+#artist="$( playerctl metadata | awk '/xesam:albumArtist /{$1=$2=""; printf $0}' )"
+artist="$( playerctl metadata | awk '/xesam:artist /{$1=$2=""; printf $0}' )"
+
+echo "${title}, ${album}, ${artist}" >> "$songListFile"
+notify-send "Pinning this Song" "\"$title\" on $album by $artist"

@@ -1,4 +1,10 @@
 #!/bin/bash
 # Pipe things to clip and they end up on your clipboard
 
-xclip -sel clip -i
+# Wayland, of course, has to be difficult.
+if [[ `echo $XDG_SESSION_TYPE` == "wayland" ]]
+then
+    wl-copy --trim-newline
+else
+    xclip -sel clip -i
+fi

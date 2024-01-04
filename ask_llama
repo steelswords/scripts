@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# File:        ask
+# Author:      Tristan Andrus
+# Description: Script to ask questions of a local LLM
+################################################################################
+
+set -o errexit   # Abort on nonzero exitstatus
+set -o nounset   # Abort on unbound variable
+set -o pipefail  # Don't hide errors within pipes
+
+trap "echo 'An error occurred! Quitting mid-script!'" ERR
+
+# Uncomment to debug
+# set -x
+
+################################################################################
+
+if [[ $# -eq 0 ]]; then
+    LLAMA_ARGS="--interactive-first"
+else
+    LLAMA_ARGS="--prompt $1"
+fi
+
+    
+
+LLAMA_DIR=/home/tristan/Projects/llama
+LLAMA_CPP_DIR="$LLAMA_DIR/llama.cpp"
+
+LLAMA_MODEL="$LLAMA_CPP_DIR/models/llama-2-7b-chat/ggml-model-f16.gguf"
+
+LLAMA_CPP="$LLAMA_CPP_DIR/main"
+
+"$LLAMA_CPP" --model "$LLAMA_MODEL"\
+             --color \
+             $LLAMA_ARGS \
+             2> /tmp/llamastats

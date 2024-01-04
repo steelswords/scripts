@@ -1,0 +1,52 @@
+#!/usr/bin/python3
+
+import platform
+import subprocess
+from halo import Halo
+from time import sleep
+import sys
+
+spinner = Halo(text = "Starting Script", spinner="dots")
+
+def getIPAddressFromSSHHost(host):
+    pass
+
+def ping(host):
+    #spinner.enabled = False
+    #spinner.enabled = True
+    pingCommand = ['ping', '-c', '1', '-q', host]
+    proc = subprocess.Popen(pingCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    while proc.returncode == None:
+        proc.poll()
+    return proc.returncode
+
+ping.numberOfPacketsSent = 0
+
+# Wait for ICMP response.
+def checkICMPConnection(host):
+    numberOfPacketsSent = 0
+    sleepInterval = 0.1
+    spinner = Halo(text = "Checking ICMP connection...", spinner="dots")
+    spinner.start()
+    while ping(host) != 0:
+        #print("Waiting...")
+        spinner.text = (f"Checking ICMP connection... ({numberOfPacketsSent} packets sent). ")
+        numberOfPacketsSent += 1
+        sleep(sleepInterval)
+    spinner.succeed(f'Can ping {host}')
+
+def attemptSSH(host):
+    spinner.text = "Connecting via SSH..."
+    spinner.start()
+    spinner.enabled = False
+    #subprocess.run(['ssh', f'root@{host}'], shell=True)
+    #subprocess.run(['ssh', f'root@{host}'])
+    command = ['ssh' f"root@{host}"]
+    subprocess.run(['ssh', 'panel1'])
+    
+
+if __name__ == "__main__":
+    host = '192.168.0.113'
+    target = sys.argv[1]
+    checkICMPConnection(host)
+    attemptSSH(host)

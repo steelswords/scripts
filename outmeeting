@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -ue -o pipefail
+
+notifierIP="192.168.0.164"
+curl "$notifierIP/green/"
+
+#echo "inmeeting" >> /tmp/meetinglightlog
+
+#if [[ ]] [[ xmessage -bg black -fg white -button yes:0,no:1 -default yes "Are you still in a meeting?"
+
+#sleep 360
+

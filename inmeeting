@@ -1,0 +1,42 @@
+#!/bin/bash
+
+set -ue -o pipefail
+
+trap 'echo "An error occcurred! Quitting now."' ERR
+trap 'echo "I see we got out of the meeting early. Excellent! Setting to green now." ; outmeeting; true' INT
+
+notifierIP="192.168.0.164"
+curl "$notifierIP/red/"
+
+#echo "inmeeting" >> /tmp/meetinglightlog
+
+#if [[ ]] [[ xmessage -bg black -fg white -button yes:0,no:1 -default yes "Are you still in a meeting?"
+
+#sleep 360
+
+if [[ $# -ge 2 ]]
+then
+    currentSeconds="$(date +%s)"
+    targetSeconds="0"
+    if [[ "$1" == "until" ]] || [[ "$1" == "for" ]]
+    then
+        targetSeconds=$(date -d "$2" +%s)
+        echo "current: $currentSeconds target: $targetSeconds"
+        secondsToSleep="$(( $targetSeconds - $currentSeconds ))"
+
+        if [[ $secondsToSleep -lt 0 ]]
+        then
+            echo "Error: target time in the past"
+            exit 1
+        fi
+        echo "Sleeping for $secondsToSleep s"
+        sleep $secondsToSleep
+        echo "Done with meeting, I hope."
+        outmeeting
+    else
+        echo "Usage: $0"
+        echo "       $0 for 30min"
+        echo "       $0 until '5:32pm'"
+        exit 2
+    fi
+fi

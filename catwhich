@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# File:        catwhich
+# Author:      Tristan Andrus
+# Description: This script takes one argument: A command. It then sees if that file
+#              is a script and cats it to the screen so you can see its contents.
+#
+#              catwhich <foo> is slightly easier and fancier than cat `which <foo>`
+################################################################################
+
+set -o errexit   # Abort on nonzero exitstatus
+set -o nounset   # Abort on unbound variable
+set -o pipefail  # Don't hide errors within pipes
+
+trap "echo 'An error occurred! Quitting mid-script!'" ERR
+
+# Uncomment to debug
+# set -x
+
+################################################################################
+
+# Check if the user has provided a command
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <command>"
+    exit 1
+fi
+
+# Check if the command exists
+if ! which "$1" 2>&1 > /dev/null; then
+    echo "Command not found: $1"
+    exit 1
+fi
+
+# Check if the command is a text file
+fileResult=$(file $(which "$1"))
+if [[ $fileResult == *"text"* ]]; then
+    cat $(which "$1")
+else
+    echo "Command is not a text file: $1"
+    exit 1
+fi

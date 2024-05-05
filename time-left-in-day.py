@@ -40,7 +40,7 @@ async def get_calendar_clients():
     if not source_registry:
         print("ERROR: Unable to get calendar events")
         sys.exit(1)
-    sources = source_registry.list_enabled(None)
+    sources = EDataServer.SourceRegistry.list_sources(source_registry, EDataServer.SOURCE_EXTENSION_CALENDAR)
     sources = [s for s in sources if s.has_extension("Calendar")]
 
     #print({source.get_display_name(): source for source in sources})
@@ -54,7 +54,7 @@ async def get_calendar_clients():
         client = ECal.Client.connect_sync(source, ECal.ClientSourceType.EVENTS, 15, None)
         if client:
             #print(client)
-            #print(f"Found source: {source.get_display_name()}")
+            print(f"Found source: {source.get_display_name()}")
             clients.append(client)
         else:
             print(f"Err: Could not get client for {source.get_display_name()}")
@@ -63,6 +63,7 @@ async def get_calendar_clients():
         await asyncio.sleep(0.01)
         #print("waiting for clients to connect...")
 
+    print(f"found {len(sources)} sources and {len(clients)} clients")
     return clients
 
 async def get_calendar_events_between_times(clients: list, start_datetime: datetime, end_datetime: datetime):
@@ -118,44 +119,65 @@ def event_to_time_block_tuple(event) -> list:
     start_time = event.get_dtstart().convert_to_zone(calendar_local_timezone).get_time()
     end_time = event.get_dtend().convert_to_zone(calendar_local_timezone).get_time()
 
+    # These come out as ResultTuples, like `(hour=8, minute=0, second=0)`. Strip the `foo=`
+    start_time = (start_time.hour, start_time.minute, start_time.second)
+    end_time = (end_time.hour, end_time.minute, end_time.second)
+
+    #print(f"in event_to_time_block_tuple for event starting at {event.get_dtstart().get_time()} and ending at {event.get_dtend().get_time()}: type= {type(start_time)} start_time = {start_time}, end_time = {end_time}")
+
     #print(f"In event_to_time_block_tuple, returning {[start_time, end_time]}")
     return [start_time, end_time]
 
 def difference_between_hms_tuples(start, later) -> tuple:
     """Takes two hms tuples and returns the difference between them in an hms tuple"""
-    hours   = min(0, later[0] - start[0])
-    minutes = min(0, later[1] - start[1])
-    seconds = min(0, later[2] - start[2])
+    hours   = later[0] - start[0]
+    minutes = later[1] - start[1]
+    seconds = later[2] - start[2]
+    print(f"Difference between start={start}, later={later} = ({hours}, {minutes}, {seconds})")
     return (hours, minutes, seconds)
 
+def consolidate_events_into_commitment_blocks(commitments: list):
+    """Takes a list of calendar events and combine any overlaps into a list of
+    commitment blocks. They take this form:
+        [ [(start_h, start_m, start_s), (end_h, end_m, end_s),
+        ...
+        ]
+    Example: I have appointments from 9:30 - 10:30, 10:00 - 11:00, and 3:15-4:00.
+    My `committed_blocks` would look like this:
+    [ ((9, 30, 0), (11, 0, 0)),
+     ((3, 15, 0), (4,  0, 0)) ]
+    """
+    # Trivial case
+    if len(commitments) < 1:
+        return []
 
-def available_hours_until(commitments: list, start_time: datetime, end_time: datetime):
-    """Gets the number of hours from now until `end_time`, minus any `commitments`
-    on your calendar. This takes into account edge cases like double booking, but
-    nothing tricky with timezones."""
-
-    # List of (hour, min, sec) tuples of commitments, but combined so double-bookings
-    # just replace or append each other, rather than overlapping.
-    # Example: I have appointments from 9:30 - 10:30, 10:00 - 11:00, and 3:15-4:00.
-    # My `committed_blocks` would look like this:
-    # [ ((9, 30, 0), (11, 0, 0)),
-    #  ((3, 15, 0), (4,  0, 0)) ]
     committed_blocks = []
 
-    eprint(f"It is {time_left_until(end_time)} hours until the end of the day.")
+    ## Since there is at least one event on the calendar, do this
+    ## Take the first event as a starting point for your committed time blocks.
+    #committed_blocks = [event_to_time_block_tuple(commitments[0])]
+    #for event in commitments:
+    #    (start_in_localtime, end_in_localtime) = event_to_time_block_tuple(event)
+    #    if (0,0,0) == difference_between_hms_tuples(start_in_localtime, end_in_localtime):
+    #        event.remove(event)
+    #        eprint("\t-> Skipping due to duration of zero")
+    #        continue
 
-    # If there are no events, just return the trivial case
-    if len(commitments) < 1:
-        return (end_time - start_time).total_seconds() / 3600.0
 
-    # If there is at least one event on the calendar, do this
-    # Take the first event as a starting point for your committed time blocks.
-    committed_blocks = [event_to_time_block_tuple(commitments[0])]
-    for event in commitments[1:]:
+    for event in commitments:
         (start_in_localtime, end_in_localtime) = event_to_time_block_tuple(event)
 
-        eprint(f"-> Description: '{event.get_summary()}' Begins: {start_in_localtime}, Ends: {event.get_dtend().get_time()}")
+        eprint(f"-> Description: '{event.get_summary()}' Begins: {start_in_localtime}, Ends: {end_in_localtime}")
         # TODO: Check if we're actually busy during these. Or does that happen upstream?
+
+        # Skip all-day events, or events with 0 duration.
+        if (0,0,0) == difference_between_hms_tuples(start_in_localtime, end_in_localtime):
+            eprint("\t-> Skipping due to duration of zero")
+            continue
+
+        # If we went through all the blocks and there was no overlap, we need to add
+        # this event to our blocks.
+        was_event_handled = False
 
         # Take the first one as a reference. For each subsequent event, check for overlap.
         # Merge if overlap occcurs.
@@ -163,73 +185,65 @@ def available_hours_until(commitments: list, start_time: datetime, end_time: dat
             # This is for my own sanity. It will catch if I missed an edge
             # case so I can fix it later.
             was_case_handled = False
-            # Is it easier to detect not overlapping?
+
+            # Is it easier to detect not overlapping and avoid that.
             if end_in_localtime < block[0] or start_in_localtime > block[1]:
+                print(f"==> No overlap. Block remains {block}")
                 # No overlap
                 was_case_handled = True
+                was_event_handled = False
             else:
                 # There is overlap.
                 block[0] = min(block[0], start_in_localtime)
                 block[1] = max(block[1], end_in_localtime)
+                print(f"==> Dealt with overlap. Now block = {block}")
                 was_case_handled = True
+                was_event_handled = True
 
-
-
-#            if start_in_localtime >= block[0] and start_in_localtime <= block[1]:
-#                # Overlap.
-#                print(
-#f"""
-#Detected overlap between this block: {block}
-#                     and this event: Description: '{event.get_summary()}' Begins: {start_in_localtime}, Ends: {event.get_dtend().get_time()}
-#  -> Event starts during the block.
-#"""
-#                      )
-#                block[1] = max(block[1], end_in_localtime)
-#                print(f"  -> modifying block to be {block}")
-#                was_case_handled = True
-#            if start_in_localtime <= block[1] and start_in_localtime <= block[0]:
-#                print(
-#f"""
-#Detected overlap between this block: {block}
-#                     and this event: Description: '{event.get_summary()}' Begins: {start_in_localtime}, Ends: {end_in_localtime}
-#  -> Event ends after block.
-#"""
-#                )
-#                # Overlap.
-#                block[1] = max(block[1], start_in_localtime)
-#                print(f"  -> modifying block to be {block}")
-#                was_case_handled = True
-#
-#            if start_in_localtime > block[1] or end_in_localtime < block[0]:
-#                # No overlap. Add this event as a separate block.
-#                committed_blocks.append([start_in_localtime, end_in_localtime])
-#                was_case_handled = True
-#
             if not was_case_handled:
                 eprint("ERROR! Unexpected edge case!")
                 eprint(f"start_in_localtime = {start_in_localtime}, end_in_localtime = {end_in_localtime}, committed_blocks = {committed_blocks}, events = {commitments}")
                 sys.exit(10)
+        if not was_event_handled:
+            # Add to committed_blocks.
+            committed_blocks.append([start_in_localtime, end_in_localtime])
+            eprint("==> This event has no overlap with any blocks. Adding to blocks list.")
+            eprint(f"==> blocks now = {committed_blocks}")
+            
+    return committed_blocks
 
-    # Now the list of committed blocks is built.
+def available_hours_until(commitments: list, start_time: datetime, end_time: datetime):
+    """Gets the number of hours from now until `end_time`, minus any `commitments`
+    on your calendar. This takes into account edge cases like double booking, but
+    nothing tricky with timezones."""
+
+    committed_blocks = consolidate_events_into_commitment_blocks(commitments)
+    print(f"~~~> Committed blocks = {committed_blocks}")
     # Iterate over the list and subtract committed blocks from the available number
     # of hours left on the clock.
     clock_hours = (end_time - start_time).total_seconds() / 3600.0
-    print("8888888888888888")
-    print(f"committed_blocks = {committed_blocks}")
-    print(f"datetime_to_hms_tuple(start_time) = {datetime_to_hms_tuple(start_time)}")
+    start_time_tuple = datetime_to_hms_tuple(start_time)
+    end_time_tuple = datetime_to_hms_tuple(end_time)
+    print(f"Checking dead time between {start_time_tuple} and {end_time_tuple}")
     for block in committed_blocks:
-        if block[0] >= datetime_to_hms_tuple(start_time):
+        # Clamp end of examination time to the start_time and end_time
+        print(f"::Checking fresh block {block}")
+        if block[0] < start_time_tuple:
+            block[0] = start_time_tuple
 
-            # TODO: This line is wrong
-            end_block_time = min(block[1], datetime_to_hms_tuple(end_time))
-            start_block_time = max(block[0], datetime_to_hms_tuple(start_time))
-            
-            time_to_subtract = difference_between_hms_tuples(start=start_block_time, later=end_block_time)
+        if block[1] > end_time_tuple:
+            block[1] = end_time_tuple
+        
+        print(f"::Checking clamped block {block}")
+        length_of_time_block = difference_between_hms_tuples(block[0], block[1])
+        length_of_time_block = hms_tuple_to_fractional_hours(length_of_time_block)
+        length_of_time_block = abs(length_of_time_block)
 
-            print(f"Taking off {hms_tuple_to_fractional_hours(time_to_subtract)} hours for chunk of comitted time {block}. Clock hours was {clock_hours}")
+        print(f"Taking off {length_of_time_block} hours because this block coincides with our start time: {block}. Clock hours was {clock_hours}.")
 
-            clock_hours = clock_hours + hms_tuple_to_fractional_hours(time_to_subtract)
-            print(f"Now clock hours is {clock_hours}")
+        clock_hours = clock_hours - length_of_time_block
+        print(f"Now clock hours is {clock_hours}")
+
     return clock_hours
 
 async def test_main():

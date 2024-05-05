@@ -37,6 +37,8 @@ def main():
 
 async def get_calendar_clients():
     source_registry = EDataServer.SourceRegistry.new_sync(None)
+    print(f"Doing this source registry:")
+    source_registry.debug_dump()
     if not source_registry:
         print("ERROR: Unable to get calendar events")
         sys.exit(1)
@@ -69,6 +71,8 @@ async def get_calendar_clients():
 async def get_calendar_events_between_times(clients: list, start_datetime: datetime, end_datetime: datetime):
     result_events = []
 
+    print(f"get_calendar_events_between_times Passed {len(clients)} clients")
+
     # TODO: Do time zone dynamically
     time_format = "%Y%m%dT%H%M%SZ"
 
@@ -76,6 +80,8 @@ async def get_calendar_events_between_times(clients: list, start_datetime: datet
     # (occur-in-time-range? (make-time "20220227T230000Z") (make-time "20220410T000000Z") "Europe/Prague")
     sexp = f"(occur-in-time-range? (make-time \"{start_datetime.strftime(time_format)}\") (make-time \"{end_datetime.strftime(time_format)}\") \"America/Denver\" )"
     for client in clients:
+        print("----------------------")
+        print(f"Checking client {client}")
 
         events_from_this_client = []
 

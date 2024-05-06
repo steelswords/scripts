@@ -42,10 +42,12 @@ async def get_calendar_clients():
     if not source_registry:
         print("ERROR: Unable to get calendar events")
         sys.exit(1)
-    sources = EDataServer.SourceRegistry.list_sources(source_registry, EDataServer.SOURCE_EXTENSION_CALENDAR)
-    sources = [s for s in sources if s.has_extension("Calendar")]
+    #sources = EDataServer.SourceRegistry.list_sources(source_registry, EDataServer.SOURCE_EXTENSION_CALENDAR)
+    #sources = [s for s in sources if s.has_extension("Calendar")]
+    sources = source_registry.list_enabled("Calendar")
+    sources = [source for source in sources if source.get_display_name() not in ("Birthdays", "Birthdays & Anniversaries", "Holidays in United States")]
 
-    #print({source.get_display_name(): source for source in sources})
+    print({source.get_display_name(): source for source in sources})
 
     # TODO: Filter obviously bad calendars, like Birthdays and Hllidays
     # TODO: This asynchronously
@@ -74,11 +76,12 @@ async def get_calendar_events_between_times(clients: list, start_datetime: datet
     print(f"get_calendar_events_between_times Passed {len(clients)} clients")
 
     # TODO: Do time zone dynamically
-    time_format = "%Y%m%dT%H%M%SZ"
+    time_format = "%Y%m%dT%H%M%S"
 
     # Example S-Expression from https://mail.gnome.org/archives/evolution-hackers/2022-March/msg00001.html:
     # (occur-in-time-range? (make-time "20220227T230000Z") (make-time "20220410T000000Z") "Europe/Prague")
     sexp = f"(occur-in-time-range? (make-time \"{start_datetime.strftime(time_format)}\") (make-time \"{end_datetime.strftime(time_format)}\") \"America/Denver\" )"
+    print(f"******* sexp = {sexp}")
     for client in clients:
         print("----------------------")
         print(f"Checking client {client}")
@@ -89,11 +92,11 @@ async def get_calendar_events_between_times(clients: list, start_datetime: datet
         result, events_from_this_client = client.get_object_list_sync(sexp, None)
         if result:
             for event in events_from_this_client:
-                if not event.get_dtstart():
-                    continue
+                #if not event.get_dtstart():
+                #    continue
 
-                #print(f"Found event {event}")
-                #print(f"Summary: {event.get_summary()}, Starts: {starttime.get_time()}")
+                print(f"))))))Found event {event}")
+                print(f"))))))Summary: {event.get_summary()}, Starts: {event.get_dtstart().get_time()}")
                 result_events.append(event)
 
         # I have been informed this is deprecated

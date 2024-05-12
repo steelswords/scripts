@@ -3,9 +3,8 @@
 import argparse
 import asyncio
 import tzlocal
-from datetime import datetime, timezone, time, timedelta
+from datetime import datetime, time, timedelta
 import gi # For calendar integration
-#from ICalGLib import Timezone
 import sys
 from tabulate import tabulate
 
@@ -42,32 +41,13 @@ ScheduledWakeUpTime = (6, 0, 0)
 
 
 def eprint(*args, **kwargs):
+    """Wrapper around print() to output to stderr"""
     print(*args, file=sys.stderr, **kwargs)
 
 def vprint(*args, **kwargs):
     """Wrapper around eprint. Only prints when verbose flag is set."""
     if cliargs.verbose:
         eprint(*args, **kwargs)
-
-def time_left_until(target_time: datetime) -> str:
-    now = datetime.now()
-
-    time_left = target_time - now
-
-    time_left_in_hours = time_left.total_seconds() / (60 * 60)
-
-    return str(round(time_left_in_hours, 2))
-
-
-def time_left_in_workday() -> str:
-    # Easiest way to get "5pm today" is to replace the hour, second, and us in now()
-    now = datetime.now()
-    quitting_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
-
-    return time_left_until(quitting_time)
-
-def main():
-    print(time_left_in_workday())
 
 async def get_calendar_clients():
     source_registry = EDataServer.SourceRegistry.new_sync(None)
@@ -93,7 +73,6 @@ async def get_calendar_clients():
 
     # TODO: This asynchronously
     clients = []
-    #print("Sources in order:")
     num_expected_clients = len(sources)
     for source in sources:
         client = ECal.Client.connect_sync(source, ECal.ClientSourceType.EVENTS, 1, None)
@@ -212,17 +191,6 @@ def consolidate_events_into_commitment_blocks(commitments: list):
 
     committed_blocks = []
 
-    ## Since there is at least one event on the calendar, do this
-    ## Take the first event as a starting point for your committed time blocks.
-    #committed_blocks = [event_to_time_block_tuple(commitments[0])]
-    #for event in commitments:
-    #    (start_in_localtime, end_in_localtime) = event_to_time_block_tuple(event)
-    #    if (0,0,0) == difference_between_hms_tuples(start_in_localtime, end_in_localtime):
-    #        event.remove(event)
-    #        vprint("\t-> Skipping due to duration of zero")
-    #        continue
-
-
     for event in commitments:
         (start_in_localtime, end_in_localtime) = event_to_time_block_tuple(event)
 
@@ -331,8 +299,7 @@ def list_events(events: list):
     print(table)
 
 
-async def test_main():
-    # TODO: Rename `today`
+async def main():
     today = datetime.now()
 
     events = [] # Assume nothing going on unless `use_calendar_events` == True
@@ -382,6 +349,9 @@ async def test_main():
         time_left = time_left.total_seconds() / 3600.0
     else:
         # Something very unexpected indeed happened
+        vprint("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        vprint(" UNEXPECTED STATE ")
+        vprint("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         time_left = -999.0
 
     if cliargs.use_calendar_events and cliargs.list_events:
@@ -402,5 +372,6 @@ if __name__ == "__main__":
 
     cliargs = parser.parse_args()
 
-    #main()
-    asyncio.run(test_main())
+    # I meant to make this asynchronous, but never got around to it. It's performant
+    # enough without it, anyway.
+    asyncio.run(main())

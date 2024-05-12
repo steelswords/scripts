@@ -342,7 +342,7 @@ async def test_main():
     # After waking up, before work starts
     if AssumeAsleepTime < now_hms_tuple and now_hms_tuple < WorkHours.start:
         vprint(f"(((((((( Early Morning. Checking time between {now_hms_tuple} and {WorkHours.start}))))))")
-        time_left = difference_between_hms_tuples(now_hms_tuple, WorkHours.start)
+        time_left = hms_tuple_to_fractional_hours(difference_between_hms_tuples(now_hms_tuple, WorkHours.start))
     # During work hours
     elif WorkHours.start <= now_hms_tuple and now_hms_tuple < WorkHours.end and today.weekday() not in (5,6):
         vprint(f"(((((((( WORK HOURS. Checking time between {now_hms_tuple} and {WorkHours.end}))))))")
@@ -379,12 +379,15 @@ async def test_main():
             wakeup_time = wakeup_time + one_day_more
 
         time_left = wakeup_time - datetime.now()
+        time_left = time_left.total_seconds() / 3600.0
     else:
         # Something very unexpected indeed happened
-        time_left = "ERROR"
+        time_left = -999.0
 
     if cliargs.use_calendar_events and cliargs.list_events:
         list_events(events)
+
+    time_left = round(float(time_left), 2)
     print(time_left)
 
 

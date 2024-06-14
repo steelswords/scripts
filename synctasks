@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# File:        synctasks.sh
+# Author:      Tristan Andrus
+# Description: Syncs personal tasks from taskwarrior
+################################################################################
+
+set -o errexit   # Abort on nonzero exitstatus
+set -o nounset   # Abort on unbound variable
+set -o pipefail  # Don't hide errors within pipes
+
+trap "echo 'An error occurred! Quitting mid-script!'" ERR
+
+# Colors for more visual statuses
+_RED_TEXT='\033[31m'
+_GREEN_TEXT='\033[32m'
+_YELLOW_TEXT='\033[33m'
+_CLEAR_TEXT='\033[0m'
+
+function echo_warning() { echo -e "${_YELLOW_TEXT}$*${_CLEAR_TEXT}" ;}
+function echo_error()   { echo -e "${_RED_TEXT}$*${_CLEAR_TEXT}"    ;}
+function echo_success() { echo -e "${_GREEN_TEXT}$*${_CLEAR_TEXT}"  ;}
+# Uncomment to debug
+# set -x
+
+################################################################################
+SYNCALL_INSTALL_DIR="$HOME/.synctasks"
+SYNCALL_VENV_DIR="${SYNCALL_INSTALL_DIR}/venv"
+
+function install() {
+    if [[ ! -d "$SYNCALL_INSTALL_DIR" ]]
+    then
+        mkdir -p "$SYNCALL_INSTALL_DIR"
+        cd "$SYNCALL_INSTALL_DIR"
+        python3 -m venv "$SYNCALL_VENV_DIR"
+        source "${SYNCALL_VENV_DIR}/bin/activate"
+        pip3 install --upgrade 'syncall[tw,caldav,google]'
+        echo_success "Installed syncall! "
+
+        # Create .env file
+        echo_warning "Enter your credentials"
+        read -p "Caldav URL: " url
+        read -p "Caldav username: " username
+        read -p "Caldav password: " password
+
+        echo "export CALDAV_URL='$url'
+export CALDAV_USERNAME='$username'
+export CALDAV_PASSWD='$password'" > "${SYNCALL_INSTALL_DIR}/.env"
+        chmod 600 "${SYNCALL_INSTALL_DIR}/.env"
+
+        echo_success "Installed credentials file! "
+
+
+    fi
+}
+
+function sync() {
+    source "${SYNCALL_VENV_DIR}/bin/activate"
+    source "${SYNCALL_INSTALL_DIR}/.env"
+
+    tw_caldav_sync --caldav-url "$CALDAV_URL" --caldav-calendar "Personal Tasks" --taskwarrior-tags "home"
+    #tw_caldav_sync --caldav-url "$CALDAV_URL" --caldav-calendar "All Tasks" --all
+    echo "Done syncing tasks."
+}
+
+if [[ ! -d "$SYNCALL_INSTALL_DIR" ]] || [[ ! -f "${SYNCALL_INSTALL_DIR}/.env" ]]
+then
+    install
+fi
+
+sync

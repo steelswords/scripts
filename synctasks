@@ -23,48 +23,6 @@ function echo_success() { echo -e "${_GREEN_TEXT}$*${_CLEAR_TEXT}"  ;}
 # set -x
 
 ################################################################################
-SYNCALL_INSTALL_DIR="$HOME/.synctasks"
-SYNCALL_VENV_DIR="${SYNCALL_INSTALL_DIR}/venv"
 
-function install() {
-    if [[ ! -d "$SYNCALL_INSTALL_DIR" ]]
-    then
-        mkdir -p "$SYNCALL_INSTALL_DIR"
-        cd "$SYNCALL_INSTALL_DIR"
-        python3 -m venv "$SYNCALL_VENV_DIR"
-        source "${SYNCALL_VENV_DIR}/bin/activate"
-        pip3 install --upgrade 'syncall[tw,caldav,google]'
-        echo_success "Installed syncall! "
-
-        # Create .env file
-        echo_warning "Enter your credentials"
-        read -p "Caldav URL: " url
-        read -p "Caldav username: " username
-        read -p "Caldav password: " password
-
-        echo "export CALDAV_URL='$url'
-export CALDAV_USERNAME='$username'
-export CALDAV_PASSWD='$password'" > "${SYNCALL_INSTALL_DIR}/.env"
-        chmod 600 "${SYNCALL_INSTALL_DIR}/.env"
-
-        echo_success "Installed credentials file! "
-
-
-    fi
-}
-
-function sync() {
-    source "${SYNCALL_VENV_DIR}/bin/activate"
-    source "${SYNCALL_INSTALL_DIR}/.env"
-
-    tw_caldav_sync --caldav-url "$CALDAV_URL" --caldav-calendar "Personal Tasks" --taskwarrior-tags "home"
-    #tw_caldav_sync --caldav-url "$CALDAV_URL" --caldav-calendar "All Tasks" --all
-    echo "Done syncing tasks."
-}
-
-if [[ ! -d "$SYNCALL_INSTALL_DIR" ]] || [[ ! -f "${SYNCALL_INSTALL_DIR}/.env" ]]
-then
-    install
-fi
-
-sync
+# This got much simpler with TaskChampion v3
+task sync

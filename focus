@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# File:        focus
+# Author:      Tristan Andrus
+# Description: Helps keep you on track by prompting you about what's in your
+#              task list.
+################################################################################
+
+set -o nounset   # Abort on unbound variable
+
+# Uncomment to debug
+# set -x
+
+################################################################################
+
+# An array of the last x responses.
+declare -a response_history=( )
+
+# Constants
+NOT_ON_TASK_RESPONSE=1
+YES_ON_TASK_RESPONSE=0
+
+# TODO: Use response_history and some heuristics to dynamcially respond to if the
+# user was on task during checkin or not
+sleep_for_a_time() {
+    sleep $(( 60 * 5 ))
+}
+
+# Echos the target task
+get_target_task() {
+    #echo "<Important and mysterious work task here>"
+    task _get $(task next limit:1 | awk 'NR==4{print $1}').description
+}
+
+
+check_in_with_user() {
+    contents_file="$(mktemp)"
+    printf "You should be working on:\n\n>>>>  %s  <<<<\n\nWere you?\n" "$(get_target_task)" > "$contents_file"
+
+    xmessage \
+        -bg "pink" \
+        -buttons "Yes:$YES_ON_TASK_RESPONSE,No:$NOT_ON_TASK_RESPONSE" \
+        -default "Yes" \
+        -timeout 10 \
+        -file "$contents_file"
+
+    response=$?
+    response_history+=("$response")
+    return $response
+}
+
+while true; do
+    check_in_with_user
+    response=$?
+    sleep_for_a_time
+done

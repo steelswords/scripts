@@ -13,16 +13,62 @@ set -o nounset   # Abort on unbound variable
 ################################################################################
 
 # An array of the last x responses.
-declare -a response_history=( )
+declare -a response_history=( 0 )
 
 # Constants
-NOT_ON_TASK_RESPONSE=1
-YES_ON_TASK_RESPONSE=0
+NOT_ON_TASK_RESPONSE=0
+YES_ON_TASK_RESPONSE=1
+
+get_recent_success_factor() {
+    WINDOW=10
+    if (( WINDOW > ${#response_history[@]} )); then
+        WINDOW=${#response_history[@]}
+    fi
+
+    # Sum of last WINDOW response members, multiplied by 1/(reverse index)
+    total_factor=0
+    for i in $(seq 1 "$WINDOW"); do
+        index=$(( i * -1 ))
+        #echo "index = $index"
+
+        # Get ready for some math: e^(2 - 0.4x)
+        e="2.71828"
+        response="${response_history[${index}]}"
+        #response=1
+        #if [[ "${response_history[${index}]}" == 0 ]]; then
+        #    response=-0.3
+        #fi
+        x="( -1 * $index )"
+        exponent_expression="(2 - 0.4 * $x )"
+        bc_input="scale=2; $total_factor +  ($e ^ $exponent_expression) * $response "
+
+        # Debug print:
+        #echo "         bc_input = $bc_input"
+
+        # TODO: bc apparently can't handle non-integer exponents. It truncates them
+        # to an int before doing the exponentiation. So I'll have to find a way
+        # around that in my formula or rewrite this in Python or something. 🙄
+        total_factor="$(bc 2>/dev/null <<< "$bc_input")"
+
+        # Debug print:
+        >&2 echo "total_factor now = $total_factor"
+    done
+    echo "$total_factor"
+}
+
+get_time_to_sleep() {
+    bc_sleep_expression="600 * $( get_recent_success_factor )" 
+    >&2 echo "bc_sleep_expression=$bc_sleep_expression"
+    seconds_to_sleep=$( bc <<< "$bc_sleep_expression" )
+    echo "$seconds_to_sleep"
+}
 
 # TODO: Use response_history and some heuristics to dynamcially respond to if the
 # user was on task during checkin or not
 sleep_for_a_time() {
-    sleep $(( 60 * 5 ))
+    seconds_to_sleep=$( get_time_to_sleep )
+    echo "I will check again @ $(date -d "+$seconds_to_sleep seconds")"
+    sleep "$seconds_to_sleep"
 }
 
 # Echos the target task
@@ -30,7 +76,6 @@ get_target_task() {
     #echo "<Important and mysterious work task here>"
     task _get $(task next limit:1 | awk 'NR==4{print $1}').description
 }
-
 
 check_in_with_user() {
     contents_file="$(mktemp)"
@@ -40,7 +85,7 @@ check_in_with_user() {
         -bg "pink" \
         -buttons "Yes:$YES_ON_TASK_RESPONSE,No:$NOT_ON_TASK_RESPONSE" \
         -default "Yes" \
-        -timeout 10 \
+        -timeout "$(get_time_to_sleep)" \
         -file "$contents_file"
 
     response=$?

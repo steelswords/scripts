@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# File:        getemail
+# Author:      Tristan Andrus
+# Description: gets email in maildir format.
+################################################################################
+
+set -o errexit   # Abort on nonzero exitstatus
+set -o nounset   # Abort on unbound variable
+set -o pipefail  # Don't hide errors within pipes
+
+trap "echo 'An error occurred! Quitting mid-script!'" ERR
+
+# Uncomment to debug
+# set -x
+
+################################################################################
+
+# Note on the setup:
+# I've got davmail acting as a bridge from all the MS365/Outlook/Exchange
+# craziness to a sane IMAP/SMTP endpoint, all locally. It binds only to my
+# machine, so others can't even access it. Not that that's a real security
+# concern anyway, because davmail itself doesn't pre-authenticate to my email
+# account. No, it leaves that up to the client that connects to it (davmail).
+#
+# So I have mbsync running as my fetcher/sender. It keeps a maildir in sync in
+# ~/.mail/work/ with my Vivint Outlook account. I have the password encrypted,
+# and it only gets decrypted on use. It never sits on the disk unencrypted.
+#
+# Then I'm using aerc as my frontend, but since I end up syncing to a maildir,
+# the world suddenly is my oyster. Just about every CLI/TUI email client
+# supports it.
+#
+# I intend to set up notmuch eventually, but I don't have the time today.
+
+################################################################################
+
+####################
+# Config files
+####################
+DAVMAIL_CONFIG_FILE="$HOME/.config/davmail/davmail.properties"
+MBSYNC_CONFIG_FILE="$HOME/.mbsyncrc"
+
+# First, make sure davmail is running.
+
+make_sure_davmail_is_running() {
+    if pgrep --full --list-full davmail | grep java; then
+        echo "-> Davmail is running already. Good!"
+    else
+        ( exec nohup davmail "$DAVMAIL_CONFIG_FILE" &> /dev/null )&
+        sleep 1
+    fi
+}
+
+sync_maildir() {
+    mbsync --config "$MBSYNC_CONFIG_FILE" --all
+}
+
+make_sure_davmail_is_running
+sync_maildir
+
+# Finally, open my frontend of choice
+#exec aerc
+

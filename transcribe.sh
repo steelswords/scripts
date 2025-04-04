@@ -32,7 +32,7 @@ TRANSCRIBE_TEMP_RECORD_FILE=/tmp/transcriptioninput.wav
 SCRIPT_DIR="$( realpath "$(dirname "${BASH_SOURCE[0]}" )" )"
 MODEL="${WHISPER_DMODEL:-$HOME/.local/whisper.cpp/models/ggml-small.en.bin}"
 # Ignore that for now.
-MODEL="$HOME/.local/whisper.cpp/models/ggml-base.en.bin"
+#MODEL="$HOME/.local/whisper.cpp/models/ggml-base.en.bin"
 NUM_THREADS=$(( $(nproc) - 1 ))
 WHISPER_EXE=whisper-cli
 
@@ -102,7 +102,7 @@ function transcribe_audio_file() {
 }
 
 function paste_to_screen() {
-    xdotool type "$1"
+    xdotool type --delay 0 --clearmodifiers "$1"
 }
 
 # TODO: Split this into do_transcription() and turn_transcription_off()

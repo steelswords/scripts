@@ -28,12 +28,14 @@ function echo_status()  { echo -e "${_BLUE_TEXT}$*${_CLEAR_TEXT}";   }
 # set -x
 
 ################################################################################
+TRANSCRIBE_TEMP_RECORD_FILE=/tmp/transcriptioninput.wav
 
 function die_loudly() {
     error_line="$1"
     echo_error "Something bad happened while running line $error_line. Quitting now."
     exit 10
 }
+
 
 
 function setup() {
@@ -80,7 +82,7 @@ function setup() {
 
 
 function is_transcription_listening() {
-    if pgrep wsi ; then
+    if [[ -f "$TRANSCRIBE_TEMP_RECORD_FILE" ]]; then
         return 0
     fi
     return 1
@@ -94,13 +96,30 @@ function turn_transcription_on() {
     echo "Turning transcription on"
     play_sound media/incoming2.mp3
 
-    ( exec wsi )&
+    touch "$TRANSCRIBE_TEMP_RECORD_FILE"
+    rec -q -t wav $TRANSCRIBE_TEMP_RECORD_FILE rate 16k 2>/dev/null &
+}
+
+function transcribe_audio_file() {
+    MODEL="$HOME/.local/whisper.cpp/models/ggml-base.en.bin"
+    NUM_THREADS=$(( $(nproc) - 1 ))
+    WHISPER_EXE=whisper-cli
+
+    str="$("$WHISPER_EXE" -t $NUM_THREADS -nt -m "$MODEL" -f "$TRANSCRIBE_TEMP_RECORD_FILE" 2>/dev/null)" 
+    echo "------------------------------- Result:"
+    echo "$str"
+    echo "---------------------------------------"
 }
 
 function turn_transcription_off() {
     echo "Turning transcription off"
     play_sound media/ding.mp3
-    pkill --signal 2 rec
+    pkill --signal 2 rec ||:
+    transcribe_audio_file
+    #echo "This is what you recorded."
+    #play "$TRANSCRIBE_TEMP_RECORD_FILE"
+    # TODO: This is not concurrency safe. Need a lock to avoid weirdness with rapid presses
+    rm "$TRANSCRIBE_TEMP_RECORD_FILE"
 }
 
 function toggle_transcription() {

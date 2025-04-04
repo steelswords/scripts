@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# File:        vimit
+# Author:      Tristan Andrus
+# Description: I'm tired of using other text editors. Or text boxes in websites.
+#               Whenever I press C-w out of habit, it closes the tab on me!
+#
+#               This script lets you edit text from a text box in vim. When you
+#               save the file, it puts it back in that window's input.
+# Requirements: xdotool, nvim
+################################################################################
+
+set -o errexit   # Abort on nonzero exitstatus
+set -o nounset   # Abort on unbound variable
+set -o pipefail  # Don't hide errors within pipes
+
+trap "echo 'An error occurred! Quitting mid-script!'" ERR
+
+# Uncomment to debug
+# set -x
+
+################################################################################
+
+echo "WARNING: Last time I used this as written it crashed X11 hard. Need to debug, Can't right now."
+exit 100
+
+echo_log() {
+    echo $* >> /tmp/vimit.log
+}
+
+target_window=$(xdotool getwindowfocus)
+
+# Eventually, I hope this will get like the website name if I'm entering in firefox,
+# or the channel in slack or something.
+function get_textbox_name() {
+    xdotool getwindowname 
+}
+
+function get_temp_file() {
+    base_name="$(mktemp)"
+    echo "$base_name-$(get_textbox_name).txt"
+}
+
+target_window_name=$(xdotool getwindowname "$target_window")
+
+echo_log "Target window = $target_window"
+
+# Ctrl-A, Ctrl-V to copy everything
+xdotool  key ctrl+a ctrl+c
+
+echo_log "Opening kitty"
+kitty --title "Vimit" "$SHELL -c nvim" &
+
+edit_window=$(xdotool search --only-visible --name 'Vimit')
+
+[[ -z "$edit_window" ]] && echo_log "Error: Could not find Vimit window."; exit 2
+
+xdotool --sync windowfocus "$edit_window"
+xdotool --sync key i 'ctrl+shift+v'
+
+

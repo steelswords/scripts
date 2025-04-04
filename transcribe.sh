@@ -29,6 +29,12 @@ function echo_status()  { echo -e "${_BLUE_TEXT}$*${_CLEAR_TEXT}";   }
 
 ################################################################################
 TRANSCRIBE_TEMP_RECORD_FILE=/tmp/transcriptioninput.wav
+SCRIPT_DIR="$( realpath "$(dirname "${BASH_SOURCE[0]}" )" )"
+MODEL="${WHISPER_DMODEL:-$HOME/.local/whisper.cpp/models/ggml-small.en.bin}"
+# Ignore that for now.
+MODEL="$HOME/.local/whisper.cpp/models/ggml-base.en.bin"
+NUM_THREADS=$(( $(nproc) - 1 ))
+WHISPER_EXE=whisper-cli
 
 function die_loudly() {
     error_line="$1"
@@ -38,6 +44,7 @@ function die_loudly() {
 
 
 
+# TODO: Fix this. It's old now.
 function setup() {
     base_dir="$HOME/Repos/notmine2"
     install_dir="$HOME/.local/whisper.cpp"
@@ -49,35 +56,23 @@ function setup() {
     git clone git@github.com:ggerganov/whisper.cpp.git --depth 1 ||:
     cd whisper.cpp || die_loudly $LINENO
 
+    echo_warning "This only compiles in CPU support for whisper.cpp. If you want truly good performance, you need to install CUDA and build with
+
+    cmake -B build -DGGML_VULKAN=0 -DGGML_CUDA=1 -DWHISPER_SDL2=ON
+    cmake --build build --config Release
+    cmake --install build --prefix $install_dir
+
+    Installation instructions can be found here: https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local
+    "
+
     cmake -B build
     cmake --build build --config Release
     cmake --install build --prefix "$install_dir"
 
-    # Just like everything in AI, things move so fast and break all. The. Time.
-    # BlahST references 'main' and 'server' instead of 'stream' and 'whisper-server'
-    # Copy these over as what it expects.
-    cp build/bin/main "$install_dir/bin/main"
-    cp build/bin/whisper-server "$install_dir/bin/server"
-
     # Install models
-    bash ./models/download-ggml-model.sh small
+    bash ./models/download-ggml-model.sh small.en
     cp -r models "$base_dir"
 
-    ############################################################################
-    # Install BlahST
-    cd "$base_dir"
-    git clone git@github.com:QuantiusBenignus/BlahST.git
-    cd BlahST || die_loudly $LINENO
-
-    echo "You will need to modify the USER CONFIGURATION BLOCK. Understand?"
-    user_input=""
-    read -r user_input
-
-    $EDITOR wsi
-
-    echo "Now installing BlahST"
-
-    $SHELL ./install-wsi
 }
 
 
@@ -94,31 +89,35 @@ function play_sound() {
 
 function turn_transcription_on() {
     echo "Turning transcription on"
-    play_sound media/incoming2.mp3
+    play_sound "$SCRIPT_DIR/media/incoming2.mp3"
 
     touch "$TRANSCRIBE_TEMP_RECORD_FILE"
     rec -q -t wav $TRANSCRIBE_TEMP_RECORD_FILE rate 16k 2>/dev/null &
 }
 
 function transcribe_audio_file() {
-    MODEL="$HOME/.local/whisper.cpp/models/ggml-base.en.bin"
-    NUM_THREADS=$(( $(nproc) - 1 ))
-    WHISPER_EXE=whisper-cli
 
     str="$("$WHISPER_EXE" -t $NUM_THREADS -nt -m "$MODEL" -f "$TRANSCRIBE_TEMP_RECORD_FILE" 2>/dev/null)" 
-    echo "------------------------------- Result:"
     echo "$str"
-    echo "---------------------------------------"
 }
 
+function paste_to_screen() {
+    xdotool type "$1"
+}
+
+# TODO: Split this into do_transcription() and turn_transcription_off()
 function turn_transcription_off() {
     echo "Turning transcription off"
-    play_sound media/ding.mp3
     pkill --signal 2 rec ||:
-    transcribe_audio_file
+    play_sound "$SCRIPT_DIR/media/ding.mp3" &
+    transcription="$(transcribe_audio_file)"
+
+    echo "$transcription"
+    paste_to_screen "$transcription"
+
     #echo "This is what you recorded."
     #play "$TRANSCRIBE_TEMP_RECORD_FILE"
-    # TODO: This is not concurrency safe. Need a lock to avoid weirdness with rapid presses
+
     rm "$TRANSCRIBE_TEMP_RECORD_FILE"
 }
 

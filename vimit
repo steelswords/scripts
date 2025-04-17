@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+edit_in_vim() {
+
+    TMPFILE=$(mktemp /tmp/nvim-edit-XXXXXXX.txt)
+
+    # Save the window we had activated 
+    target_window=$(xdotool getactivewindow)
+
+    kitty nvim "$TMPFILE"
+
+    # If the file was saved and not empty, paste contents.
+    if [[ -s "$TMPFILE" ]]; then
+        xclip -selection clipboard < "$TMPFILE"
+
+        xdotool windowactivate --sync "$target_window"
+
+        xdotool key --clearmodifiers  ctrl+v
+    fi
+
+    rm -f "$TMPFILE"
+}
+
+edit_in_vim

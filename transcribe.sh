@@ -43,7 +43,6 @@ function die_loudly() {
 }
 
 
-
 # TODO: Fix this. It's old now.
 function setup() {
     base_dir="$HOME/Repos/notmine2"
@@ -97,7 +96,7 @@ function turn_transcription_on() {
 
 function transcribe_audio_file() {
 
-    str="$("$WHISPER_EXE" -t $NUM_THREADS -nt -m "$MODEL" -f "$TRANSCRIBE_TEMP_RECORD_FILE" 2>/dev/null)" 
+    str="$("$WHISPER_EXE" -t $NUM_THREADS -nt -m "$MODEL" -f "$TRANSCRIBE_TEMP_RECORD_FILE" 2>>/tmp/transcribe.log)" 
     echo "$str"
 }
 

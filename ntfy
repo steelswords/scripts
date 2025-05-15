@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+# Default values
+SERVER="https://nuntia.luthadel-artificers.duckdns.org"
+TITLE="Notification"
+PRIORITY=3
+TAGS=()
+ATTACH=""
+TOPIC="donejobs"
+TOKEN=$(pass ntfytoken)
+
+usage() {
+  echo "Usage: $0 -t <topic> -m <message> [options]"
+  echo
+  echo "Options:"
+  echo "  -t <topic>           Topic to send to (required)"
+  echo "  -m <message>         Message body (required)"
+  echo "  -T <title>           Notification title (default: 'Notification')"
+  echo "  -p <priority>        Priority (1-4, default: 3)"
+  echo "  -g <tag>             Add tag (can be used multiple times)"
+  echo "  -a <url>             Attachment URL"
+  echo "  -s <server>          ntfy server URL (default: https://ntfy.sh)"
+  echo "  -h                   Show this help"
+  exit 1
+}
+
+while getopts "t:m:T:p:g:a:s:h" opt; do
+  case "$opt" in
+    t) TOPIC="$OPTARG" ;;
+    m) MESSAGE="$OPTARG" ;;
+    T) TITLE="$OPTARG" ;;
+    p) PRIORITY="$OPTARG" ;;
+    g) TAGS+=("$OPTARG") ;;
+    a) ATTACH="$OPTARG" ;;
+    s) SERVER="$OPTARG" ;;
+    h) usage ;;
+    *) usage ;;
+  esac
+done
+
+# Check required arguments
+if [ -z "$TOPIC" ] || [ -z "$MESSAGE" ]; then
+  echo "❌ Error: Topic and message are required."
+  usage
+fi
+
+# Construct headers
+HEADERS=(-H "Title: $TITLE"
+    -H "Priority: $PRIORITY"
+    -H "Authorization: Bearer $TOKEN"
+)
+[ "${#TAGS[@]}" -gt 0 ] && HEADERS+=(-H "Tags: $(IFS=,; echo "${TAGS[*]}")")
+[ -n "$ATTACH" ] && HEADERS+=(-H "Attach: $ATTACH")
+
+
+URL="${SERVER%/}/$TOPIC"
+
+# Send notification
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${HEADERS[@]}" -d "$MESSAGE" "$URL")
+
+if [ "$RESPONSE" == "200" ]; then
+  echo "✅ Notification sent successfully."
+else
+  echo "❌ Failed to send notification (HTTP $RESPONSE)."
+  exit 1
+fi
+

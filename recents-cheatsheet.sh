@@ -25,6 +25,7 @@ Alt+Shift+I  <b>vimit</b>           Open nvim, paste saved contents into text in
 Ctrl+Insert  <b>transcribe.sh</b>   Toggle transcription and pasting into current text input
 pass         <b>pass</b>            Cli password manager
 nnn          <b>nnn</b>             Tui file manager
+bitmask.py   <b>bitmask.py</b>      Show bitmask decomposition
 </tt>
 "
 

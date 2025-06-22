@@ -72,6 +72,9 @@ function setup() {
     bash ./models/download-ggml-model.sh small.en
     cp -r models "$base_dir"
 
+    echo_status "Installing requisite packages"
+    sudo apt install mpg123 xdotool sox
+
 }
 
 

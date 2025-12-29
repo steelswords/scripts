@@ -14,52 +14,65 @@ trap "echo 'An error occurred! Quitting mid-script!'" ERR
 
 ################################################################################
 
-function nuke_dir() {
-    shopt -s globstar
-    dir="${1:-}"
+function print_usage() {
+    echo "Usage: nuke.sh <space separated list of folders and files to securely delete"
+}
 
-    if [[ ! -d $dir ]]; then
-        echo "ERROR: $dir is not a directory. Quitting."
+function nuke_target() {
+    shopt -s globstar
+    target_file="${1:-}"
+
+    if [[ -d $target_file ]]; then
+
+        find "$target_file" -type f -exec shred -vuz {} \;
+
+        echo "Removing directories now."
+
+        for d in "$target_file"/**; do
+            echo " Boom, there goes $d"
+            rm -rf "$d"
+        done
+    elif [[ -f "$target_file" ]]; then
+        shred -vuz "$target_file"
+        echo " Boom, there goes $target_file"
+        rm -rf "$target_file"
+    else
+        echo "ERROR: $target_file is not a directory or regular file. Quitting."
         exit 1
     fi
-
-    find "$dir" -type f -exec shred -vuz {} \;
-
-    echo "Removing directories now."
-
-    for d in "$dir"/**; do
-        echo " Boom, there goes $d"
-        rm -rf "$d"
-    done
-
-    echo "󰚤 Done nuking $dir! ☢"
+    echo "󰚤 Done nuking $target_file! ☢"
 
     echo "When you're done having fun deleting files, you might want to run
 
-    scrub -X $dir"
+    scrub -X $target_file"
 }
 
-if [[ $# -eq 0 ]]; then
-    echo "Usage: $0 <directory to nuke>"
+
+# Check if print usage is requested
+if [[ $# -eq 0 ]] || [[ $1 == '-h' ]] || [[ $1 == '--help' ]] ; then
+    print_usage
     exit 0
 fi
 
-dir="${1:-}"
-
-for d in "${directories_to_nuke[@]}"; do
+# Print files to delete
+for d in "$@"; do
     echo "This will delete $d"
 done
 
 echo ""
 
-read -p 'Are you sure?? [y/N] ' confirmation
+
+# Get confirmation
+read -r -p 'Are you sure?? [y/N] ' confirmation
 if [[ "$confirmation" = "y" ]] || [[ "$confirmation" = "Y" ]]; then
     echo "Alright, you asked for it."
     echo "NUKE! 󰚤"
-    nuke_dir "$dir"
+    for target in "$@"; do
+        nuke_target "$target"
+    done
 else
     echo "Did not get user confirmation. Quitting without nuking anything."
-    exit 1
+    exit 2
 fi
 
 
